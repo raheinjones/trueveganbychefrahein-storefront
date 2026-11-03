@@ -1,0 +1,113 @@
+import React, { useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { useSafeTabBarHeight as useBottomTabBarHeight } from '../hooks/use-safe-tab-bar-height';
+import { ScrollView, Animated } from 'react-native';
+import { YStack } from 'tamagui';
+import StoreHeader from '../components/StoreHeader';
+import StoreCategoriesGrid from '../components/StoreCategoriesGrid';
+import StoreCategoriesPills from '../components/StoreCategoriesPills';
+import CategoryProductSlider from '../components/CategoryProductSlider';
+import useStorefrontData from '../hooks/use-storefront-data';
+import useStorefrontInfo from '../hooks/use-storefront-info';
+import LocationPicker from '../components/LocationPicker';
+import CustomHeader from '../components/CustomHeader';
+import { LanguageButton } from '../ui';
+import Spacer from '../components/Spacer';
+import { storefrontConfig, handleNavigateNewLocation } from '../utils';
+
+const StoreHomeScreen = () => {
+    const navigation = useNavigation();
+    const customHeaderHeight = 270;
+    const scrollY = useRef(new Animated.Value(0)).current;
+    const { info, store, mode } = useStorefrontInfo();
+    const { data: categories } = useStorefrontData(
+        (storefront) => (mode === 'network' && store ? storefront.categories.query({ store: store.id }) : storefront.categories.findAll()),
+        { defaultValue: [], persistKey: `${info.id}_categories`, dependencies: [mode, store?.id] }
+    );
+    const categoriesDisplay = storefrontConfig('storeCategoriesDisplay', 'grid');
+    const tabBarHeight = useBottomTabBarHeight();
+
+    // Interpolated animations
+    const headerOpacity = scrollY.interpolate({
+        inputRange: [0, customHeaderHeight],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+    });
+
+    const headerTranslateY = scrollY.interpolate({
+        inputRange: [0, customHeaderHeight],
+        outputRange: [0, -customHeaderHeight],
+        extrapolate: 'clamp',
+    });
+
+    const storeHeaderWrapperStyle = {
+        opacity: headerOpacity,
+        transform: [{ translateY: headerTranslateY }],
+    };
+
+    return (
+        <YStack flex={1} bg='$background'>
+            <Animated.View
+                style={[
+                    {
+                        position: 'absolute',
+                        width: '100%',
+                        zIndex: 2,
+                    },
+                    storeHeaderWrapperStyle,
+                ]}
+            >
+                <CustomHeader
+                    headerRowProps={{ px: '$3' }}
+                    headerTransparent={true}
+                    headerStyle={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 99 }}
+                    headerLeft={<LocationPicker onPressAddNewLocation={({ params }) => handleNavigateNewLocation(navigation, params)} />}
+                    headerLeftStyle={{ justifyContent: 'flex-start' }}
+                    headerRight={<LanguageButton floating />}
+                />
+                <StoreHeader storeName={info.name} logoUrl={info.logo_url} backgroundUrl={info.backdrop_url} description={info.description} height={customHeaderHeight} showLocationPicker={mode === 'network' ? true : undefined} />
+            </Animated.View>
+            <ScrollView
+                onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+                scrollEventThrottle={16}
+                contentContainerStyle={{
+                    paddingTop: customHeaderHeight,
+                    paddingBottom: 20,
+                }}
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+            >
+                <YStack space='$3'>
+                    <YStack>
+                        {categoriesDisplay === 'grid' && (
+                            <YStack padding='$3'>
+                                <StoreCategoriesGrid
+                                    categories={categories || []}
+                                    justifyContent='start'
+                                    itemContainerWidth={100}
+                                    onPressCategory={(category) => navigation.navigate('StoreCategory', { category: category.serialize(), categoryId: category.id, storeId: store?.id })}
+                                />
+                            </YStack>
+                        )}
+                        {categoriesDisplay === 'pills' && (
+                            <YStack pt='$4' pb='$2'>
+                                <StoreCategoriesPills
+                                    categories={categories || []}
+                                    onPressCategory={(category) => navigation.navigate('StoreCategory', { category: category.serialize(), categoryId: category.id, storeId: store?.id })}
+                                />
+                            </YStack>
+                        )}
+                    </YStack>
+                    <YStack space='$4'>
+                        {categories.map((category, index) => (
+                            <CategoryProductSlider key={index} category={category} onPressCategory={(category) => navigation.navigate('StoreCategory', { category: category.serialize(), categoryId: category.id, storeId: store?.id })} />
+                        ))}
+                    </YStack>
+                </YStack>
+                <Spacer height={tabBarHeight} />
+            </ScrollView>
+        </YStack>
+    );
+};
+
+export default StoreHomeScreen;

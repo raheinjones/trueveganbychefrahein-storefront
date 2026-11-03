@@ -1,0 +1,60 @@
+import React, { createContext, useCallback, useContext, useEffect, useMemo, ReactNode } from 'react';
+import { getLangNameFromCode } from 'language-name-map';
+import { storefrontConfig } from '../utils';
+import { ensureTranslationsLoaded } from '../utils/localize';
+import localeEmoji from 'locale-emoji';
+import useStorage from '../hooks/use-storage';
+import I18n from 'react-native-i18n';
+
+type LanguageInfo = { code: string; emoji?: string; name?: string; native?: string; [key: string]: unknown };
+
+interface LanguageContextProps {
+    locale: string;
+    setLocale: (locale: string) => void;
+    t: (key: string, options?: Record<string, any>) => string;
+    current?: LanguageInfo;
+    language?: LanguageInfo;
+    languages?: LanguageInfo[];
+}
+
+const LanguageContext = createContext<LanguageContextProps>({
+    locale: 'en',
+    setLocale: () => {},
+    t: () => '',
+});
+
+export const LanguageProvider = ({ children }: { children: ReactNode }) => {
+    ensureTranslationsLoaded();
+    const [locale, setLocaleState] = useStorage<string>('_locale', storefrontConfig('defaultLocale', 'en'));
+
+    // The languages the build offers (AVAILABLE_LOCALES), of those the app has translations for.
+    const offered = (storefrontConfig('availableLocales') ?? []) as string[];
+    const languages = Object.keys(I18n.translations)
+        .filter((code) => !offered.length || offered.includes(code))
+        .map((code) => {
+            return { code, ...getLangNameFromCode(code), emoji: localeEmoji(code) };
+        });
+
+    const language = useMemo(() => {
+        return { code: locale, ...getLangNameFromCode(locale), emoji: localeEmoji(locale) };
+    }, [locale]);
+
+    const setLocale = (newLocale: string) => {
+        I18n.locale = newLocale;
+        setLocaleState(newLocale);
+    };
+
+    useEffect(() => {
+        I18n.locale = locale;
+    }, [locale]);
+
+    // Stable per locale, so screens can depend on `t` in effects without refetching on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const t = useCallback((key: string, options?: Record<string, any>) => I18n.t(key, options), [locale]);
+
+    return <LanguageContext.Provider value={{ locale, setLocale, t, current: language, language, languages }}>{children}</LanguageContext.Provider>;
+};
+
+export const useLanguage = () => {
+    return useContext(LanguageContext);
+};

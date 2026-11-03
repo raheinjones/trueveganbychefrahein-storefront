@@ -1,0 +1,10 @@
+{
+  "app": "storefront",
+  "upstream": {
+    "repository": "https://github.com/fleetbase/storefront-app",
+    "release": "v0.1.1"
+  },
+  "name": "True Vegan by Chef Rahein",
+  "bundleId": "com.trueveganbychefrahein.storefront",
+  "androidPackage": "com.trueveganbychefrahein.storefront"
+}
